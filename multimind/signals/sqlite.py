@@ -88,7 +88,7 @@ class SqliteSignalStore:
         with self._lock:
             if limit is not None:
                 cursor = self._conn.execute(
-                    "SELECT model_id, input_text, predicted_label, corrected_label, original_confidence "
+                    "SELECT id, model_id, input_text, predicted_label, corrected_label, original_confidence "
                     "FROM model_signals "
                     "WHERE model_id = ? AND consumed = 0 "
                     "ORDER BY created_at ASC "
@@ -97,7 +97,7 @@ class SqliteSignalStore:
                 )
             else:
                 cursor = self._conn.execute(
-                    "SELECT model_id, input_text, predicted_label, corrected_label, original_confidence "
+                    "SELECT id, model_id, input_text, predicted_label, corrected_label, original_confidence "
                     "FROM model_signals "
                     "WHERE model_id = ? AND consumed = 0 "
                     "ORDER BY created_at ASC",
@@ -105,17 +105,31 @@ class SqliteSignalStore:
                 )
             return [
                 TrainingSignal(
-                    model_id=row[0],
-                    input_text=row[1],
-                    predicted_label=row[2],
-                    corrected_label=row[3],
-                    original_confidence=row[4],
+                    model_id=row[1],
+                    input_text=row[2],
+                    predicted_label=row[3],
+                    corrected_label=row[4],
+                    original_confidence=row[5],
+                    signal_id=str(row[0]),
                 )
                 for row in cursor.fetchall()
             ]
 
-    def mark_consumed(self, model_id: str) -> None:
-        """Mark signals as consumed (after successful retrain)."""
+    def mark_consumed(self, model_id: str, signal_ids: list[str]) -> None:
+        """Mark specific signals as consumed (after successful retrain)."""
+        if not signal_ids:
+            return
+        with self._lock:
+            placeholders = ", ".join("?" for _ in signal_ids)
+            self._conn.execute(
+                f"UPDATE model_signals SET consumed = 1 "
+                f"WHERE model_id = ? AND id IN ({placeholders}) AND consumed = 0",
+                [model_id] + [int(sid) for sid in signal_ids],
+            )
+            self._conn.commit()
+
+    def mark_all_consumed(self, model_id: str) -> None:
+        """Mark all pending signals for a model as consumed."""
         with self._lock:
             self._conn.execute(
                 "UPDATE model_signals SET consumed = 1 WHERE model_id = ? AND consumed = 0",

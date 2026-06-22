@@ -106,7 +106,7 @@ class PgSignalStore:
         with self._conn.cursor() as cur:
             if limit is not None:
                 cur.execute(
-                    "SELECT model_id, input_text, predicted_label, corrected_label, original_confidence "
+                    "SELECT id::text, model_id, input_text, predicted_label, corrected_label, original_confidence "
                     "FROM model_signals "
                     "WHERE model_id = %s AND consumed = FALSE "
                     "ORDER BY created_at ASC "
@@ -115,7 +115,7 @@ class PgSignalStore:
                 )
             else:
                 cur.execute(
-                    "SELECT model_id, input_text, predicted_label, corrected_label, original_confidence "
+                    "SELECT id::text, model_id, input_text, predicted_label, corrected_label, original_confidence "
                     "FROM model_signals "
                     "WHERE model_id = %s AND consumed = FALSE "
                     "ORDER BY created_at ASC",
@@ -123,17 +123,30 @@ class PgSignalStore:
                 )
             return [
                 TrainingSignal(
-                    model_id=row[0],
-                    input_text=row[1],
-                    predicted_label=row[2],
-                    corrected_label=row[3],
-                    original_confidence=row[4],
+                    model_id=row[1],
+                    input_text=row[2],
+                    predicted_label=row[3],
+                    corrected_label=row[4],
+                    original_confidence=row[5],
+                    signal_id=row[0],
                 )
                 for row in cur.fetchall()
             ]
 
-    def mark_consumed(self, model_id: str) -> None:
-        """Mark signals as consumed (after successful retrain)."""
+    def mark_consumed(self, model_id: str, signal_ids: list[str]) -> None:
+        """Mark specific signals as consumed (after successful retrain)."""
+        if not signal_ids:
+            return
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "UPDATE model_signals SET consumed = TRUE "
+                "WHERE model_id = %s AND id = ANY(%s::uuid[]) AND consumed = FALSE",
+                (model_id, signal_ids),
+            )
+        self._conn.commit()
+
+    def mark_all_consumed(self, model_id: str) -> None:
+        """Mark all pending signals for a model as consumed."""
         with self._conn.cursor() as cur:
             cur.execute(
                 "UPDATE model_signals SET consumed = TRUE "

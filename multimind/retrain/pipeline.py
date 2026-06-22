@@ -148,9 +148,10 @@ class RetrainPipeline:
                     self._model_id, e,
                 )
 
-            # 6. Mark signals as consumed
+            # 6. Mark exported signals as consumed (targeted, not blanket)
+            consumed_ids = [s.signal_id for s in batch if s.signal_id is not None]
             try:
-                signal_store.mark_consumed(self._model_id)
+                signal_store.mark_consumed(self._model_id, consumed_ids)
             except Exception as e:
                 logger.error(
                     "retrain: failed to mark signals consumed for %s: %s",

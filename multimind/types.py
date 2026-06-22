@@ -83,22 +83,27 @@ class TrainingSignal:
         predicted_label: The model's original prediction.
         corrected_label: The corrected label (ground truth from user/system).
         original_confidence: Optional confidence of the original prediction.
+        signal_id: Storage-assigned row ID (populated on export, ``None`` when creating).
     """
     model_id: str
     input_text: str
     predicted_label: str
     corrected_label: str
     original_confidence: float | None = None
+    signal_id: str | None = None
 
     def to_dict(self) -> dict:
         """Serialise to a plain dict."""
-        return {
+        d = {
             "model_id": self.model_id,
             "input_text": self.input_text,
             "predicted_label": self.predicted_label,
             "corrected_label": self.corrected_label,
             "original_confidence": self.original_confidence,
         }
+        if self.signal_id is not None:
+            d["signal_id"] = self.signal_id
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> TrainingSignal:
@@ -109,6 +114,7 @@ class TrainingSignal:
             predicted_label=d["predicted_label"],
             corrected_label=d["corrected_label"],
             original_confidence=d.get("original_confidence"),
+            signal_id=d.get("signal_id"),
         )
 
 
@@ -164,6 +170,18 @@ class SignalStore(Protocol):
         """
         ...
 
-    def mark_consumed(self, model_id: str) -> None:
-        """Mark signals as consumed (after successful retrain)."""
+    def mark_consumed(self, model_id: str, signal_ids: list[str]) -> None:
+        """Mark specific signals as consumed (after successful retrain).
+
+        Only the signals with the given IDs are marked. This prevents
+        silently eating signals that arrived between export and consume.
+        """
+        ...
+
+    def mark_all_consumed(self, model_id: str) -> None:
+        """Mark **all** pending signals for a model as consumed.
+
+        Use sparingly — prefer ``mark_consumed`` with specific IDs to
+        avoid racing with newly-arrived signals.
+        """
         ...
