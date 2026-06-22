@@ -107,13 +107,12 @@ class RetrainPipeline:
             self._running = True
 
         try:
-            # 1. Export pending signals
-            signals = signal_store.export_pending(self._model_id)
-            if not signals:
+            # 1. Export pending signals (limited at the DB level)
+            batch = signal_store.export_pending(
+                self._model_id, limit=self._config.batch_size
+            )
+            if not batch:
                 raise RuntimeError("no pending signals")
-
-            batch_size = min(len(signals), self._config.batch_size)
-            batch = signals[:batch_size]
 
             logger.info(
                 "retrain: starting cycle for %s (%d signals)",

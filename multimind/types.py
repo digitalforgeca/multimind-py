@@ -153,8 +153,15 @@ class SignalStore(Protocol):
         """Count signals for a given model since last retrain."""
         ...
 
-    def export_pending(self, model_id: str) -> list[TrainingSignal]:
-        """Export pending signals for retraining."""
+    def export_pending(
+        self, model_id: str, *, limit: int | None = None
+    ) -> list[TrainingSignal]:
+        """Export pending signals for retraining.
+
+        Args:
+            model_id: Model to export signals for.
+            limit: Maximum rows to return. ``None`` means all pending.
+        """
         ...
 
     def mark_consumed(self, model_id: str) -> None:

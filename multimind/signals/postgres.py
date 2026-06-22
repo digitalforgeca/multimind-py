@@ -94,16 +94,33 @@ class PgSignalStore:
             row = cur.fetchone()
             return int(row[0]) if row else 0
 
-    def export_pending(self, model_id: str) -> list[TrainingSignal]:
-        """Export pending signals for retraining."""
+    def export_pending(
+        self, model_id: str, *, limit: int | None = None
+    ) -> list[TrainingSignal]:
+        """Export pending signals for retraining.
+
+        Args:
+            model_id: Model to export signals for.
+            limit: Maximum rows to return. ``None`` means all pending.
+        """
         with self._conn.cursor() as cur:
-            cur.execute(
-                "SELECT model_id, input_text, predicted_label, corrected_label, original_confidence "
-                "FROM model_signals "
-                "WHERE model_id = %s AND consumed = FALSE "
-                "ORDER BY created_at ASC",
-                (model_id,),
-            )
+            if limit is not None:
+                cur.execute(
+                    "SELECT model_id, input_text, predicted_label, corrected_label, original_confidence "
+                    "FROM model_signals "
+                    "WHERE model_id = %s AND consumed = FALSE "
+                    "ORDER BY created_at ASC "
+                    "LIMIT %s",
+                    (model_id, limit),
+                )
+            else:
+                cur.execute(
+                    "SELECT model_id, input_text, predicted_label, corrected_label, original_confidence "
+                    "FROM model_signals "
+                    "WHERE model_id = %s AND consumed = FALSE "
+                    "ORDER BY created_at ASC",
+                    (model_id,),
+                )
             return [
                 TrainingSignal(
                     model_id=row[0],
